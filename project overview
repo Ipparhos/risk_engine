@@ -1,0 +1,115 @@
+Here is the high-level architecture diagram and a detailed milestone breakdown for your Value at Risk (VaR) calculator. This plan strictly mirrors the EIB’s target architecture so that every piece of code you write directly demonstrates a skill they are hiring for.
+
+### High-Level Architecture Diagram
+
+This diagram maps your demo project to the layers mentioned in the EIB job description:
+
+```text
+[ External Data ] (Yahoo Finance CSV / Proxy for Wallstreet Suite)
+       |
+       v
++-------------------------------------------------------------+
+| 1. DATA LAYER (Data Ingestion & Cleaning)                   |
+|    Module: `data_loader.py`                                 |
+|    Tech: Pandas / PySpark                                   |
++-------------------------------------------------------------+
+       |
+       v
++-------------------------------------------------------------+
+| 2. PROCESSING LAYER (Core Python Framework)                 |
+|    Module: `risk_calculator.py`                             |
+|    Tech: Pure Python, NumPy, Strict Type Hinting            |
++-------------------------------------------------------------+
+       |
+       v
++-------------------------------------------------------------+
+| 3. QUALITY & TESTING (Governance & BDD)                     |
+|    Module: `features/` (Gherkin syntax) & CI/CD Mock        |
+|    Tech: Behave (BDD), Pytest, Flake8, Black, Mypy          |
++-------------------------------------------------------------+
+       |
+       v
+[ Storage / Output ] (SQLite DB or JSON / Proxy for Oracle DB)
+
+```
+
+---
+
+### Milestone Breakdown & Detailed Documentation
+
+#### Milestone 1: Project Setup & Governance (The Foundation)
+
+Before writing any calculation logic, you must establish the "Quality & Governance" standards required to support "citizen developers."
+
+* **Objective:** Create a highly reproducible, cleanly formatted Python environment.
+* **Tasks:**
+* Initialize a Git repository.
+* Set up a Python virtual environment (`venv` or `conda`).
+* Create a `requirements.txt` containing: `pandas`, `numpy`, `behave`, `pytest`, `black`, `flake8`, and `mypy`.
+* Create a `pyproject.toml` or `setup.cfg` to configure your linters (e.g., setting line length to 88 for `black`).
+
+
+* **EIB Relevance:** Proves you know how to enforce coding standards and ensure the project is ready for SonarQube integration.
+
+#### Milestone 2: Data Ingestion (The Data Layer)
+
+You will build a module that securely and reliably ingests financial data, simulating the extraction from their Denodo/Wallstreet Suite layers.
+
+* **Objective:** Read historical stock data, clean it, and prepare it for calculation.
+* **Tasks:**
+* Download a historical CSV of a major stock index (e.g., S&P 500) over the last 5 years.
+* Create `data_loader.py`. Write a class `MarketDataLoader` that reads the CSV.
+* Implement robust error handling: What happens if the CSV is missing? What if a day's price is `NaN`? (Hint: Forward-fill or drop missing values, and log a warning).
+* Calculate the daily returns from the closing prices.
+
+
+* **EIB Relevance:** Demonstrates your ability to handle data pipelines and debug data inconsistencies, which is a major part of the early-morning production support.
+
+#### Milestone 3: Core Financial Framework (The Processing Layer)
+
+This is where your physics and math background shines. You will build the central computation engine.
+
+* **Objective:** Implement modular, reusable risk models.
+* **Tasks:**
+* Create `risk_calculator.py`.
+* Implement **Historical VaR**: Sorting the historical daily returns and finding the 5th percentile (for a 95% confidence interval).
+* Implement **Parametric VaR** (Variance-Covariance method) to show your mathematical depth. The formula for the parametric VaR calculation is:
+$$ VaR_{parametric} = \text{Portfolio Value} \times \left( \mu_{returns} - z \times \sigma_{returns} \right) $$
+*(Where $\mu$ is the mean return, $\sigma$ is the standard deviation, and $z$ is the z-score for the confidence interval).*
+* Use strict Python type hints (e.g., `def calculate_var(returns: pd.Series, confidence_level: float = 0.95) -> float:`) to ensure reusability.
+
+
+* **EIB Relevance:** Fulfills the requirement to "build a common Python framework" and standardize financial calculations.
+
+#### Milestone 4: Test Automation (Behavior Driven Development)
+
+The job description explicitly flags test automation and BDD concepts as "very important."
+
+* **Objective:** Prove your financial calculations are fully testable and reproducible using plain English.
+* **Tasks:**
+* Install and configure the `behave` library.
+* Create a `features/` directory and a `calculate_risk.feature` file.
+* Write scenarios in Gherkin syntax (Given, When, Then). For example, testing what happens when a citizen developer passes a `0.99` confidence level versus a `0.95` level.
+* Implement the step definitions in Python that connect the English sentences to your `risk_calculator.py` functions.
+* Write standard unit tests using `pytest` for edge cases (e.g., passing an empty dataset to the calculator).
+
+
+* **EIB Relevance:** Directly addresses their requirement for automated test frameworks (unit + integration) and BDD.
+
+#### Milestone 5: Output, Storage, and Presentation
+
+Wrap the project up by simulating the final delivery to the storage layer and documenting it for the hiring manager.
+
+* **Objective:** Finalize the pipeline and write a professional README.
+* **Tasks:**
+* Create a simple `main.py` script that ties everything together: loads the data, calculates the VaR, and saves the output to a local SQLite database or a JSON file (simulating the Oracle DB storage layer).
+* Write a comprehensive `README.md`. It must include:
+* Project purpose (Mapping to 1st Line of Defence Risk Calculation).
+* Instructions on how to run the pipeline.
+* Instructions on how to execute the BDD tests (`behave`).
+* Instructions on how to run the linters (`flake8`, `black`).
+
+
+
+
+* **EIB Relevance:** Shows you understand the entire software development lifecycle and can communicate architectural decisions clearly to both engineers and finance users.
