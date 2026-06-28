@@ -1,115 +1,87 @@
-Here is the high-level architecture diagram and a detailed milestone breakdown for your Value at Risk (VaR) calculator. This plan strictly mirrors the EIB’s target architecture so that every piece of code you write directly demonstrates a skill they are hiring for.
+# Risk Engine Project Overview
 
-### High-Level Architecture Diagram
+This document outlines the target architecture, modular structure, and module descriptions for the Risk Engine. It is designed to act as a production-grade, highly-extensible framework for calculating and storing various financial risk metrics.
 
-This diagram maps your demo project to the layers mentioned in the EIB job description:
+---
+
+## 1. Directory Structure & Architecture
+
+Below is the directory structure for the risk engine, showing how calculators, storage, testing, configuration, and CI/CD pipelines are organized.
 
 ```text
-[ External Data ] (Yahoo Finance CSV / Proxy for Wallstreet Suite)
-       |
-       v
-+-------------------------------------------------------------+
-| 1. DATA LAYER (Data Ingestion & Cleaning)                   |
-|    Module: `data_loader.py`                                 |
-|    Tech: Pandas / PySpark                                   |
-+-------------------------------------------------------------+
-       |
-       v
-+-------------------------------------------------------------+
-| 2. PROCESSING LAYER (Core Python Framework)                 |
-|    Module: `risk_calculator.py`                             |
-|    Tech: Pure Python, NumPy, Strict Type Hinting            |
-+-------------------------------------------------------------+
-       |
-       v
-+-------------------------------------------------------------+
-| 3. QUALITY & TESTING (Governance & BDD)                     |
-|    Module: `features/` (Gherkin syntax) & CI/CD Mock        |
-|    Tech: Behave (BDD), Pytest, Flake8, Black, Mypy          |
-+-------------------------------------------------------------+
-       |
-       v
-[ Storage / Output ] (SQLite DB or JSON / Proxy for Oracle DB)
-
+risk_engine/
+├── calculators/
+│   ├── base_calculator.py       ← abstract base class (framework)
+│   ├── market_risk/
+│   │   ├── var_calculator.py    ← Historical & Parametric VaR implementation
+│   │   └── data_loader.py       ← yfinance data ingestion
+│   ├── credit_risk/
+│   │   └── pfe_calculator.py    ← Potential Future Exposure
+│   └── liquidity/
+│       └── lcr_calculator.py    ← Liquidity Coverage Ratio
+├── storage/
+│   ├── models.py                ← SQLAlchemy ORM models
+│   └── repository.py            ← write/query risk results
+├── tests/
+│   ├── unit/
+│   │   ├── test_var.py
+│   │   ├── test_pfe.py
+│   │   └── test_lcr.py
+│   └── bdd/
+│       ├── features/
+│       │   ├── var.feature      ← Gherkin scenarios
+│       │   ├── pfe.feature
+│       │   └── lcr.feature
+│       └── steps/
+│           ├── var_steps.py
+│           └── lcr_steps.py
+├── config/
+│   └── settings.py              ← DB URL, thresholds, run params
+├── main.py                      ← CLI entry point
+├── sonar-project.properties     ← SonarQube config
+├── pyproject.toml
+└── .github/workflows/ci.yml     ← pytest + coverage on push
 ```
 
 ---
 
-### Milestone Breakdown & Detailed Documentation
+## 2. Module Descriptions & Responsibilities
 
-#### Milestone 1: Project Setup & Governance (The Foundation)
+### Core Calculators Framework (`calculators/`)
+This framework standardizes all risk models to ensure scalability and ease of extension.
+* **`base_calculator.py`**: Definess the abstract base class `BaseCalculator` using Python's `abc` module. It enforces consistent interfaces across all calculators (e.g., standard initialization, validation, and a uniform `calculate()` method).
+* **Market Risk (`calculators/market_risk/`)**:
+  * **`var_calculator.py`**: Computes **Value at Risk (VaR)** using two different methodologies:
+    * **Historical VaR**: Sorting historical daily returns to find a specific percentile (e.g., 95% or 99% confidence level).
+    * **Parametric VaR**: Using variance-covariance methodology to calculate portfolio VaR:
+      $$ VaR_{parametric} = \text{Portfolio Value} \times \left( \mu_{returns} - z \times \sigma_{returns} \right) $$
+  * **`data_loader.py`**: Handles external data ingestion (e.g., via `yfinance` or local CSVs). Features robust cleaning routines, missing-data handling (e.g., forward-filling NaN values), and computes log/daily returns.
+* **Credit Risk (`calculators/credit_risk/`)**:
+  * **`pfe_calculator.py`**: Simulates and calculates the **Potential Future Exposure (PFE)** to evaluate counterparty credit risk over given time horizons at specified confidence levels.
+* **Liquidity Risk (`calculators/liquidity/`)**:
+  * **`lcr_calculator.py`**: Calculates the **Liquidity Coverage Ratio (LCR)**, ensuring the portfolio holds sufficient high-quality liquid assets (HQLA) to survive a specified stress scenario.
 
-Before writing any calculation logic, you must establish the "Quality & Governance" standards required to support "citizen developers."
+### Storage & ORM Layer (`storage/`)
+Handles persistent storage of risk calculations, allowing historical tracking and audits.
+* **`models.py`**: Defines SQLAlchemy declarative ORM models representing Risk Run metadata and metric outputs (e.g., tables for VaR results, PFE paths, LCR calculations).
+* **`repository.py`**: Implements the Repository pattern. Abstracts database interactions, offering clear methods to persist calculation results and query historical risk runs safely using sessions.
 
-* **Objective:** Create a highly reproducible, cleanly formatted Python environment.
-* **Tasks:**
-* Initialize a Git repository.
-* Set up a Python virtual environment (`venv` or `conda`).
-* Create a `requirements.txt` containing: `pandas`, `numpy`, `behave`, `pytest`, `black`, `flake8`, and `mypy`.
-* Create a `pyproject.toml` or `setup.cfg` to configure your linters (e.g., setting line length to 88 for `black`).
+### Configuration Layer (`config/`)
+Provides centralized control over the application.
+* **`settings.py`**: Parses configuration from environment variables or settings files. Manages sensitive parameters like database connection strings (DB URL), risk tolerance thresholds, and operational run configurations.
 
+### Entry Point & Orchestration (`main.py`)
+* **`main.py`**: The command-line interface (CLI) and orchestrator. It parses CLI arguments to run specific calculations, loads necessary data, executes the calculators, and saves results to the database via the storage repository.
 
-* **EIB Relevance:** Proves you know how to enforce coding standards and ensure the project is ready for SonarQube integration.
+### Testing Framework (`tests/`)
+Ensures model correctness, prevents regression, and documents requirements in executable formats.
+* **Unit Testing (`tests/unit/`)**:
+  * `test_var.py`, `test_pfe.py`, `test_lcr.py`: Houses pytest unit tests focused on mocking dependencies, validating edge cases (e.g., empty datasets, zero values), and confirming mathematical accuracy.
+* **Behavior Driven Development (`tests/bdd/`)**:
+  * `features/`: Contains business-readable Gherkin feature files (`var.feature`, `pfe.feature`, `lcr.feature`) outlining scenarios using `Given`, `When`, `Then` syntax.
+  * `steps/`: Houses step definitions linking the BDD feature scenarios to the python calculator implementations.
 
-#### Milestone 2: Data Ingestion (The Data Layer)
-
-You will build a module that securely and reliably ingests financial data, simulating the extraction from their Denodo/Wallstreet Suite layers.
-
-* **Objective:** Read historical stock data, clean it, and prepare it for calculation.
-* **Tasks:**
-* Download a historical CSV of a major stock index (e.g., S&P 500) over the last 5 years.
-* Create `data_loader.py`. Write a class `MarketDataLoader` that reads the CSV.
-* Implement robust error handling: What happens if the CSV is missing? What if a day's price is `NaN`? (Hint: Forward-fill or drop missing values, and log a warning).
-* Calculate the daily returns from the closing prices.
-
-
-* **EIB Relevance:** Demonstrates your ability to handle data pipelines and debug data inconsistencies, which is a major part of the early-morning production support.
-
-#### Milestone 3: Core Financial Framework (The Processing Layer)
-
-This is where your physics and math background shines. You will build the central computation engine.
-
-* **Objective:** Implement modular, reusable risk models.
-* **Tasks:**
-* Create `risk_calculator.py`.
-* Implement **Historical VaR**: Sorting the historical daily returns and finding the 5th percentile (for a 95% confidence interval).
-* Implement **Parametric VaR** (Variance-Covariance method) to show your mathematical depth. The formula for the parametric VaR calculation is:
-$$ VaR_{parametric} = \text{Portfolio Value} \times \left( \mu_{returns} - z \times \sigma_{returns} \right) $$
-*(Where $\mu$ is the mean return, $\sigma$ is the standard deviation, and $z$ is the z-score for the confidence interval).*
-* Use strict Python type hints (e.g., `def calculate_var(returns: pd.Series, confidence_level: float = 0.95) -> float:`) to ensure reusability.
-
-
-* **EIB Relevance:** Fulfills the requirement to "build a common Python framework" and standardize financial calculations.
-
-#### Milestone 4: Test Automation (Behavior Driven Development)
-
-The job description explicitly flags test automation and BDD concepts as "very important."
-
-* **Objective:** Prove your financial calculations are fully testable and reproducible using plain English.
-* **Tasks:**
-* Install and configure the `behave` library.
-* Create a `features/` directory and a `calculate_risk.feature` file.
-* Write scenarios in Gherkin syntax (Given, When, Then). For example, testing what happens when a citizen developer passes a `0.99` confidence level versus a `0.95` level.
-* Implement the step definitions in Python that connect the English sentences to your `risk_calculator.py` functions.
-* Write standard unit tests using `pytest` for edge cases (e.g., passing an empty dataset to the calculator).
-
-
-* **EIB Relevance:** Directly addresses their requirement for automated test frameworks (unit + integration) and BDD.
-
-#### Milestone 5: Output, Storage, and Presentation
-
-Wrap the project up by simulating the final delivery to the storage layer and documenting it for the hiring manager.
-
-* **Objective:** Finalize the pipeline and write a professional README.
-* **Tasks:**
-* Create a simple `main.py` script that ties everything together: loads the data, calculates the VaR, and saves the output to a local SQLite database or a JSON file (simulating the Oracle DB storage layer).
-* Write a comprehensive `README.md`. It must include:
-* Project purpose (Mapping to 1st Line of Defence Risk Calculation).
-* Instructions on how to run the pipeline.
-* Instructions on how to execute the BDD tests (`behave`).
-* Instructions on how to run the linters (`flake8`, `black`).
-
-
-
-
-* **EIB Relevance:** Shows you understand the entire software development lifecycle and can communicate architectural decisions clearly to both engineers and finance users.
+### Infrastructure & Quality Governance
+* **`sonar-project.properties`**: Sets up static code analysis guidelines, code coverage targets, and code duplication thresholds for SonarQube.
+* **`pyproject.toml`**: Modern Python project metadata configuring packaging, dependencies, and formatting/linting tooling (e.g., Ruff, Black, Mypy, Flake8).
+* **`.github/workflows/ci.yml`**: Automates CI pipeline on repository pushes and pull requests. Runs linting, checks type safety, runs pytest suite, and publishes test coverage metrics.
